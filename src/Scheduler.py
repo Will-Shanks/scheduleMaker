@@ -1,9 +1,7 @@
 import MySQLdb
 from collections import defaultdict
 import secrets
-# import copy
 
-# TODO: create .env file for this info
 db = MySQLdb.connect(host=secrets.DBHOST, user=secrets.DBUSER, passwd=secrets.DBPASSWD, db=secrets.DBNAME)
 cur = db.cursor()
 
@@ -230,8 +228,6 @@ def makeScheds(edges, required):
 
 
 def main():
-    #TODO: make interface to get class list from user
-    #TODO: add way to filter what sections (i.e. I want section 1 of CSCI3104 and not section 2 of MATH3510 and no classes before 10)
     classes = "CSCI 3104-200B, MATH 3510, HIND1020-1, CSCI3155, CSCI3022, PHYS1140"  # list of desired courses
     requiredCourses = ["MATH3510"]
     courses = list(set(classes.strip().replace(" ", "").split(',')))  # make list of course codes
@@ -245,8 +241,6 @@ def main():
         i += 1
     #Scheds.computeRanking()
     #Scheds.printSchedules()
-    #TODO: make GUI to visually represent each sched on a calendar for visual comparison
-    #TODO: come up with ways to rank schedules by how good they are (avg day length, days of class, shortes day, earliest class, latest class etc)
     print("bye")
 
 
