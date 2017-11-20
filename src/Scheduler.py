@@ -1,14 +1,51 @@
 import MySQLdb
 from collections import defaultdict
+import itertools
 import secrets
 
 db = MySQLdb.connect(host=secrets.DBHOST, user=secrets.DBUSER, passwd=secrets.DBPASSWD, db=secrets.DBNAME)
 cur = db.cursor()
 
+class Node:
+    def __init__(self, sections):
+        self.days = {'M': [], 'T': [], 'W': [], 'R': [], 'F': []}
+        self.sections = sections
+        if isinstance(sections, int):
+            self.addSection(sections)
+        else:
+            for section in sections:
+                self.addSection(section)
+        for day in self.days:
+            self.days[day].sort()
 
-def findSections(courses):
-    sections = []
-    for course in courses:
+    def addSection(self, sectionID):
+        cur.execute("SELECT start, finish, days FROM section WHERE id='" + str(sectionID) + "';")
+        sectionInfo = cur.fetchone()
+        if sectionInfo[2] == "ONLINE":
+            return
+        for day in sectionInfo[2]:
+            self.days[day].append([sectionInfo[0], sectionInfo[1]])
+
+    def isCompat(self, b):
+        for day in self.days:
+            if self.days[day] != [] and b.days[day] != []:
+                for timeRange in self.days[day]:
+                    i = 0
+                    while i < len(b.days[day]):
+                        if timeRange[0] == b.days[day][i][0] or timeRange[1] == b.days[day][i][1]:
+                            return False
+                        if timeRange[0] < b.days[day][i][0]: # self starts before b
+                            if timeRange[1] > b.days[day][i][0]:
+                                return False
+                        if timeRange[0] > b.days[day][i][0]:
+                            if timeRange[1] < b.days[day][i][1]:
+                                return False
+                        i += 1
+        return True
+
+
+def getSections(courses):
+    def getCourse(course):
         sectionCode = False
         sectionComp = False
         courseCode = course
@@ -20,7 +57,8 @@ def findSections(courses):
         cur.execute("SELECT id FROM course WHERE code='" + courseCode + "';")
         courseID = str(cur.fetchone()[0])
         if sectionCode:
-            cur.execute("SELECT component FROM SECTION WHERE section = '" + sectionCode + "' and  course_id='" + courseID + "';")
+            cur.execute(
+                "SELECT component FROM SECTION WHERE section = '" + sectionCode + "' and  course_id='" + courseID + "';")
             sectionComp = cur.fetchone()[0]
 
         cur.execute(("SELECT Distinct component FROM section WHERE course_id='" + courseID + "';"))
@@ -31,16 +69,20 @@ def findSections(courses):
                 cur.execute(
                     "SELECT * FROM section WHERE course_id='" + courseID + "' AND section ='" + sectionCode + "';")
             else:
-                cur.execute("SELECT * FROM section WHERE course_id='" + courseID + "' AND component ='" + sect[0] + "';")
+                cur.execute(
+                    "SELECT * FROM section WHERE course_id='" + courseID + "' AND component ='" + sect[0] + "';")
             sections.append(cur.fetchall())
-
+    sections = []
+    if isinstance(courses, str):
+        getCourse(courses)
+    else:
+        for course in courses:
+            getCourse(course)
     sections.sort(key=lambda course: len(
         course))  # sorts sections so the courses with least sections are first for performance
     return sections
 
-
-
-def BuildGraph(sections):
+def buildChoiceGraph(sections):
     def isCompat(a, b):
         # index 6 is string of days section meets ex: MTWRF
         # index 4 is start time of section meeting (24hr)
@@ -62,7 +104,8 @@ def BuildGraph(sections):
         for j in range(len(sections[i])):  # traverse through each section of a course
 
             sectID = str(sections[i][j][0])
-            for k in range(1, len(sections) - i):  # traverse relevant courses (row i + 1 is first row below self in matrix)
+            for k in range(1, len(
+                    sections) - i):  # traverse relevant courses (row i + 1 is first row below self in matrix)
                 for l in range(len(sections[k + i])):  # traverse through sections of each course
                     if isCompat(sections[i][j], sections[i + k][l]):
                         newSectID = str(sections[i + k][l][0])
@@ -70,109 +113,14 @@ def BuildGraph(sections):
                         intersect[newSectID].add(sectID)
     return intersect
 
-
-class Day:
-    def __init__(self):
-        self.start = None
-        self.finish = None
-        self.classes = []
-        self.dayLength = 0
-        self.timeInClass = 0
-
-    def hasClass(self):
-        if self.dayLength > 0:
-            return True
-        else:
-            return False
-
-    def getDayLen(self):
-        return self.dayLength
-
-    def addClass(self, sectionID, start, finish):
-        self.classes.append(sectionID)
-        if start:  # checks not online class
-            self.timeInClass += (finish - start).seconds
-            if self.start:
-                startDelta = self.start.seconds - start.seconds  # if start is earlier than self.start will be positive
-                if startDelta > 0:
-                    self.dayLength += startDelta
-                    self.start = start
-                finishDelta = finish.seconds - self.finish.seconds  # if finish is later than self.finish will be positive
-                if finishDelta > 0:
-                    self.dayLength += finishDelta
-                    self.finish = finish
-            else:
-                self.start = start
-                self.finish = finish
-                self.dayLength = finish.seconds - start.seconds
-
-
-class Week:
-    def __init__(self, sections):
-        self.days = {'M': Day(), 'T': Day(), 'W': Day(), 'R': Day(), 'F': Day()}
-        for sectionID in sections:
-            cur.execute("SELECT start, finish, days FROM section WHERE id='" + str(sectionID) + "';")
-            sectionInfo = cur.fetchone()
-            if sectionInfo[2] != "ONLINE":
-                for day in sectionInfo[2]:
-                    self.days[day].addClass(sectionID, sectionInfo[0], sectionInfo[1])
-
-    def getWeekTime(self):
-        time = 0
-        for k, day in self.days.items():
-            time += day.getDayLen()
-        return time
-
-
-    def longestDayLen(self):
-        length = 0
-        for k, day in self.days.items():
-            curDayLen = day.getDayLen()
-            if curDayLen > length:
-                length = curDayLen
-        return length
-
-    def daysOfClass(self):
-        days = 0
-        for k, day in self.days.items():
-            if day.hasClass():
-                days += 1
-        return days
-
-
-
-
-def printSched(scheds):
-    for sectionID in scheds:
-        cur.execute("SELECT course_id, component, section FROM SECTION WHERE id = '" + str(sectionID) + "';")
-        sectionInfo = cur.fetchone()
-        cur.execute("SELECT name, code FROM course WHERE id='" + str(sectionInfo[0]) + "';")
-        courseInfo = cur.fetchone()
-        print(courseInfo[1] + "-" + str(sectionInfo[2]) + "     " + courseInfo[0] + "  " + sectionInfo[1])
-    print("============================================")
-
-#    def computeRanking(self):
-#        # figure out avg day length (start of first class to end of last), free time in day, start of earliest class, end of latest class, number of days with class, longest day length
-#        # compute score based off of this
-#        self.week = Week(self.Sched)
-#        self.longestDay = self.week.longestDayLen()
-#        self.numDays = self.week.daysOfClass()
-#        self.avgDayLen = self.week.getWeekTime()/self.numDays
-#
-#    def getNumDays(self):
-#        return self.numDays
-#
-#    def getLongestDay(self):
-#        return self.longestDay
-#
-#    def getAVGDayLength(self):
-#        return self.avgDayLen
-
-
-def makeScheds(edges, required):
-
+def getCliques(edges, minCourses, numSections):
     def addComplete():
         nonlocal solutions
+        if isinstance(compsub[0], Node):
+            if len(compsub) < minCourses:
+                return
+            solutions.add(tuple(compsub))
+            return
         courses = defaultdict(list)
         for section in compsub:
             cur.execute("SELECT course_id FROM SECTION WHERE id = '" + section + "';")
@@ -182,16 +130,22 @@ def makeScheds(edges, required):
             cur.execute("SELECT COUNT(DISTINCT component) FROM section WHERE course_id =" + course + ";")
             if (len(courses[course]) != cur.fetchone()[0]):
                 courses.pop(course)
-        if required:
-            for thing in required:
-                cur.execute("SELECT id from course where  code = '"+ thing + "';")
-                if(str(cur.fetchone()[0]) not in courses):
-                    return
-        courses = list(courses.values())
-        courses = [item for sublist in courses for item in sublist]
-        courses.sort(key=lambda x: int(x))
-        courses = tuple(courses)
-        solutions.add(courses)
+        if minCourses == -1:
+            if len(compsub) < (numSections - 1):
+                return
+        if len(courses) < minCourses:
+            return
+
+        courseCombos = list(itertools.combinations(courses, minCourses))
+        for combo in courseCombos:
+            option = []
+            for thing in combo:
+                option.append(courses[thing])
+            option = [item for sublist in option for item in sublist]
+            option.sort(key=lambda x: int(x))
+            option = tuple(option)
+            solutions.add(option)
+
     def recurfunct(candidates, nays):
         nonlocal compsub
         if not candidates and not nays:
@@ -208,9 +162,14 @@ def makeScheds(edges, required):
 
     def getConnected(vertex, oldSet):
         newSet = set()
-        for neighbor in edges[str(vertex)]:
-            if neighbor in oldSet:
-                newSet.add(neighbor)
+        if isinstance(vertex, Node):
+            for neighbor in edges[vertex]:
+                if neighbor in oldSet:
+                    newSet.add(neighbor)
+        else:
+            for neighbor in edges[str(vertex)]:
+                if neighbor in oldSet:
+                    newSet.add(neighbor)
         return newSet
 
     compsub = []
@@ -219,30 +178,73 @@ def makeScheds(edges, required):
     recurfunct(possibles, set())
     return solutions
 
+def getChoiceOptions(choice):
+    sections = getSections(choice[0])
+    if len(sections) == 1:
+        return set([sections[0][0][0]])
+    edges = buildChoiceGraph(sections)
+    options = getCliques(edges, choice[1], len(sections))
+    return options
 
+def buildSchedGraph(choiceCliques):
+    vertexNodes = []
+    for choiceList in choiceCliques:
+        choiceNodes = []
+        for choice in choiceList:
+            choiceNodes.append(Node(choice))
+        vertexNodes.append(choiceNodes)
+    graph = defaultdict(set)
+    for i in range(len(vertexNodes) - 1):
+        for j in range(len(vertexNodes[i])):
+            k = len(vertexNodes) - 1
+            while k > i:
+                for l in range(len(vertexNodes[k])):
+                    if vertexNodes[i][j].isCompat(vertexNodes[k][l]):
+                        graph[vertexNodes[i][j]].add(vertexNodes[k][l])
+                        graph[vertexNodes[k][l]].add(vertexNodes[i][j])
+                k -= 1
+    return graph
 
+def getScheds(choiceCliques, minChoices, hasRequired):
+    graph = buildSchedGraph(choiceCliques)
+    scheds = getCliques(graph, minChoices, len(choiceCliques))
+    return scheds
 
-
-
-
+def printSched(scheds):
+    for sectionID in scheds:
+        cur.execute("SELECT course_id, component, section FROM SECTION WHERE id = '" + str(sectionID) + "';")
+        sectionInfo = cur.fetchone()
+        cur.execute("SELECT name, code FROM course WHERE id='" + str(sectionInfo[0]) + "';")
+        courseInfo = cur.fetchone()
+        print(courseInfo[1] + "-" + str(sectionInfo[2]) + "     " + courseInfo[0] + "  " + sectionInfo[1])
+    print("============================================")
 
 
 def main():
-    classes = "CSCI 3104-200B, MATH 3510, HIND1020-1, CSCI3155, CSCI3022, PHYS1140"  # list of desired courses
-    requiredCourses = ["MATH3510"]
-    courses = list(set(classes.strip().replace(" ", "").split(',')))  # make list of course codes
-    sections = findSections(courses)
-    edges = BuildGraph(sections)
-    scheds = makeScheds(edges, requiredCourses)  # creates list(q) of all possible schedules
-    i = 1
-    for item in scheds:
-        print(i)
-        printSched(item)
-        i += 1
-    #Scheds.computeRanking()
-    #Scheds.printSchedules()
-    print("bye")
+    choices = [[["Math3510", "CSCI3104"], 2], [["HIND1020"], 1]]#, [["CSCI3155"], 1], [["CSCI3022"], 1], [["PHYS1140"], 1]]
+    # a choice is given as: [[<courses>], <number to choose>]
+    # if choice[1] is not an int, and is == -1 then this is the list of required courses/sections
+    choiceOptions = []
+    for choice in choices:
+        choiceOptions.append(getChoiceOptions(choice))
+    scheds = getScheds(choiceOptions, len(choices), -1 == choices[0][1]) #if choices[0][1] == -1 then there is a list of required
 
+    sorted = []
+    for sched in scheds:
+        temp = []
+        for choice in sched:
+            if isinstance(choice.sections, int):
+                temp.append(choice.sections)
+            else:
+                for sect in choice.sections:
+                    temp.append(int(sect))
+        temp.sort()
+        sorted.append(temp)
+    sorted.sort()
+    for sched in sorted:
+        printSched(sched)
+    #print("bye!")
+    print(len(scheds))
 
 if __name__== "__main__":
     main()
