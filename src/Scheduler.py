@@ -100,9 +100,6 @@ def buildGraph(vertexNodes):
 # Returns list of nodes where each node is a clique of size <numNodesToChoose> of the input nodes
 def getCliques(graphEdges, numNodesToChoose):
     def addComplete():
-        if len(compsub) < numNodesToChoose:
-            return
-
         courses = defaultdict(list)
         for item in compsub:
             for sectID in item.sections:
@@ -121,7 +118,8 @@ def getCliques(graphEdges, numNodesToChoose):
             option = []
             for thing in combo:
                 option += courses[thing]
-            solutions.append(Node(option))
+                option.sort()
+            solutions.add(tuple(option))
 
     def recurfunct(candidates, nays):
         nonlocal compsub
@@ -136,6 +134,7 @@ def getCliques(graphEdges, numNodesToChoose):
                 recurfunct(candidatesTemp, naysTemp)
                 compsub.pop()
                 nays.append(selected)
+                pass
 
     def getConnected(vertex, oldSet):
         newSet = []
@@ -150,10 +149,11 @@ def getCliques(graphEdges, numNodesToChoose):
         return newSet
 
     compsub = []
-    solutions = []
+    solutions = set()
     possibles = list(graphEdges.keys())
     recurfunct(possibles, [])
-    return solutions
+    results = [Node(x) for x in solutions]
+    return results
 
 def main(choices):
     # options will be matrix of section nodes
@@ -183,11 +183,18 @@ def main(choices):
 
     options.sort(key=lambda comp: len(comp))
     edges = buildGraph(options)
-    options = getCliques(edges, len(choices))
+    numToChoose = 0
+    for choice in choices:
+        numToChoose += choice[1]
+    options = getCliques(edges, numToChoose)
+    sections = [x.sections for x in options]
+    sections.sort()
     pass
+    for x in sections:
+        print(x)
 
 
 if __name__ == "__main__":
-    choices = [[["Math3510", "CSCI3104"], 2], [["HIND1020"], 1]]#, [["CSCI3155"], 1], [["CSCI3022"], 1], [["PHYS1140"], 1]]
+    choices = [[["Math3510"],1], [["CSCI3104"], 1], [["HIND1020"], 1]]#, [["CSCI3155"], 1], [["CSCI3022"], 1], [["PHYS1140"], 1]]
     main(choices)
     exit(0)
