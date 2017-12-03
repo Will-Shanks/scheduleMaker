@@ -45,6 +45,30 @@ class Node:
                         i += 1
         return True
 
+    def computeRank(self):
+        self.daysOfClass = 0
+        self.longestDay = 0
+        self.avgDayLen = 0
+        self.earliestStart = None
+        self.latestFinish = None
+        for day in self.days.values():
+            if not day == []:
+                if (self.earliestStart is None) or (day[0][0].seconds < self.earliestStart.seconds):
+                    self.earliestStart = day[0][0]
+                if (self.latestFinish is None) or (day[len(day)-1][1].seconds > self.latestFinish.seconds):
+                    self.latestFinish = day[len(day)-1][1]
+                self.daysOfClass += 1
+                dayLen = day[len(day)-1][1].seconds - day[0][0].seconds
+                self.avgDayLen += dayLen
+                if dayLen > self.longestDay:
+                    self.longestDay = dayLen
+        self.avgDayLen = (self.avgDayLen/self.daysOfClass)/3600
+        self.longestDay /= 3600
+        '''
+        stats:
+        num credits, free time in day, longest break, has online?, 
+        '''
+
 # Takes course/section ID
 # Returns matrix of Nodes (course component x section) (each section is a node)
 def getCourseComponents(course):
@@ -197,14 +221,10 @@ def main(choices):
     for choice in choices:
         numToChoose += choice[1]
     options = getCliques(edges, numToChoose)
-    sections = [x.sections for x in options]
-    sections.sort()
-    pass
-    for x in sections:
-        print(x)
-
+    for sched in options:
+        sched.computeRank()
 
 if __name__ == "__main__":
-    choices = [[["Math3510", "CSCI3104"], 2]]#, [["HIND1020"], 1]]#, [["CSCI3155"], 1], [["CSCI3022"], 1], [["PHYS1140"], 1]]
+    choices = [[["Math3510", "CSCI3104"], 2], [["HIND1020"], 1]]#, [["CSCI3155"], 1], [["CSCI3022"], 1], [["PHYS1140"], 1]]
     main(choices)
     exit(0)
