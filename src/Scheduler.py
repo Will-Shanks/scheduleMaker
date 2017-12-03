@@ -154,7 +154,10 @@ def getCliques(graphEdges, numNodesToChoose):
         if not candidates and not nays:
             addComplete()
         else:
-            for selected in candidates.copy():
+            u = max(candidates, key=lambda x: len([x for x in graphEdges[x] if x in candidates]))
+            # u = max(candidates, key=lambda x: len(graphEdges[x]))
+            uConn = getConnected(u, candidates)
+            for selected in [x for x in candidates.copy() if x not in uConn]:
                 candidates.remove(selected)
                 candidatesTemp = getConnected(selected, candidates)
                 naysTemp = getConnected(selected, nays)
@@ -225,6 +228,6 @@ def main(choices):
         sched.computeRank()
 
 if __name__ == "__main__":
-    choices = [[["Math3510", "CSCI3104"], 2], [["HIND1020"], 1]]#, [["CSCI3155"], 1], [["CSCI3022"], 1], [["PHYS1140"], 1]]
+    choices = [[["Math3510", "CSCI3104"], 2]]#, [["HIND1020"], 1]]#, [["CSCI3155"], 1], [["CSCI3022"], 1], [["PHYS1140"], 1]]
     main(choices)
     exit(0)
