@@ -1,12 +1,14 @@
 import MySQLdb
 from collections import defaultdict
 import itertools
-import copy
+from flask import Flask
+import json
 import secrets
 
 db = MySQLdb.connect(host=secrets.DBHOST, user=secrets.DBUSER, passwd=secrets.DBPASSWD, db=secrets.DBNAME)
 cur = db.cursor()
 
+app = Flask(__name__)
 
 class Node:
     def __init__(self, sections):
@@ -192,8 +194,9 @@ def getCliques(graphEdges, numNodesToChoose):
     results = [Node(x) for x in solutions]
     return results
 
-def main(choices):
-    # options will be matrix of section nodes
+@app.route('/<choices>')
+def getScheds(choices):
+    choices = json.loads(choices)# options will be matrix of section nodes
     options = []
     # choice == ["course1", ... "coursen"], numToChoose
     # makes matrix of nodes where each node is a clique
@@ -224,10 +227,11 @@ def main(choices):
     for choice in choices:
         numToChoose += choice[1]
     options = getCliques(edges, numToChoose)
-    for sched in options:
-        sched.computeRank()
+    return json.dumps([x.sections for x in options])
+
+
 
 if __name__ == "__main__":
-    choices = [[["Math3510", "CSCI3104"], 2]]#, [["HIND1020"], 1]]#, [["CSCI3155"], 1], [["CSCI3022"], 1], [["PHYS1140"], 1]]
-    main(choices)
+    choices = '[[["Math3510"],1], [["CSCI3104"],1],[[ "HIND1020"],1],[[ "CSCI3155"],1],[[ "PHYS1140"],1]]'
+    test = getScheds(choices)
     exit(0)
