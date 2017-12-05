@@ -3,6 +3,7 @@ from collections import defaultdict
 import itertools
 from flask import Flask
 import json
+import datetime
 import secrets
 
 db = MySQLdb.connect(host=secrets.DBHOST, user=secrets.DBUSER, passwd=secrets.DBPASSWD, db=secrets.DBNAME)
@@ -53,8 +54,13 @@ class Node:
         self.avgDayLen = 0
         self.earliestStart = None
         self.latestFinish = None
+        self.longestGap = None
         for day in self.days.values():
             if not day == []:
+                if len(day) >= 2:
+                    for i in range(len(day)-1):
+                        if(self.longestGap is None) or (self.longestGap < (day[i+1][0].seconds - day[i][1].seconds)):
+                            self.longestGap = day[i+1][0].seconds - day[i][1].seconds
                 if (self.earliestStart is None) or (day[0][0].seconds < self.earliestStart.seconds):
                     self.earliestStart = day[0][0]
                 if (self.latestFinish is None) or (day[len(day)-1][1].seconds > self.latestFinish.seconds):
@@ -66,6 +72,7 @@ class Node:
                     self.longestDay = dayLen
         self.avgDayLen = (self.avgDayLen/self.daysOfClass)/3600
         self.longestDay /= 3600
+        self.longestGap /= 3600
         '''
         stats:
         num credits, free time in day, longest break, has online?, 
@@ -86,6 +93,7 @@ def getCourseComponents(course):
     cur.execute("SELECT id FROM course WHERE code='" + courseCode + "';")
     courseID = str(cur.fetchone()[0])
     if sectionCode:
+        sectionCode = sectionCode.lstrip('0')
         cur.execute(
             "SELECT component FROM SECTION WHERE section = '" + sectionCode + "' and  course_id='" + courseID + "';")
         sectionComp = cur.fetchone()[0]
@@ -136,7 +144,7 @@ def getCliques(graphEdges, numNodesToChoose):
                 cur.execute("SELECT course_id FROM SECTION WHERE id = '" + str(sectID) + "';")
                 courseCode = cur.fetchone()[0]
                 courses[str(courseCode)].append(sectID)
-        for course in courses.keys():
+        for course in list(courses.keys())[:]:
             cur.execute("SELECT COUNT(DISTINCT component) FROM section WHERE course_id =" + course + ";")
             if (len(courses[course]) != cur.fetchone()[0]):
                 courses.pop(course)
@@ -227,11 +235,40 @@ def getScheds(choices):
     for choice in choices:
         numToChoose += choice[1]
     options = getCliques(edges, numToChoose)
-    return json.dumps([x.sections for x in options])
+    for x in options:
+        x.computeRank()
+    return options
 
+def filterByStart(scheds, earliestStart):
+    earliestStart = earliestStart.split(":")
+    earliestStart = int(earliestStart[0]) * 3600 + int(earliestStart[1]) * 60
+    scheds = [x for x in scheds if x.earliestStart.seconds >= earliestStart]
 
+    return scheds
+
+def filterByFinish(scheds, finishTime):
+    finishTime = finishTime.split(':')
+    finishTime = int(finishTime[0]) * 3600 + int(finishTime[1]) * 60
+    scheds = [x for x in scheds if x.latestFinish.seconds <= finishTime]
+    return scheds
+
+def filterByLongestGap(scheds, maxGap):
+    maxGap = maxGap.split(':')
+    maxGap = int(maxGap[0]) + (int(maxGap[1]) / 3600)
+    scheds = [x for x in scheds if x.longestGap <= maxGap]
+    return scheds
 
 if __name__ == "__main__":
-    choices = '[[["Math3510"],1], [["CSCI3104"],1],[[ "HIND1020"],1],[[ "CSCI3155"],1],[[ "PHYS1140"],1]]'
-    test = getScheds(choices)
+    choices = '[[["HIND1020-001", "CSCI3104-100", "CSCI3155-100"],3]]'
+    scheds = getScheds(choices)
+    scheds = filterByStart(scheds, '9:00')
+    #scheds = filterByFinish(scheds, '17:00')
+    #scheds = filterByLongestGap(scheds, '3:00')
+
+    scheds.sort(key=lambda x: x.longestDay)
+    scheds.sort(key=lambda x: x.latestFinish.seconds, reverse=True)
+    scheds.sort(key=lambda x: x.earliestStart.seconds)
+    scheds.sort(key=lambda x: x.avgDayLen)
+    scheds.sort(key=lambda x: x.longestGap)
+    scheds.sort(key=lambda x: x.daysOfClass)
     exit(0)
