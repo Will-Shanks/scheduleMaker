@@ -271,4 +271,10 @@ if __name__ == "__main__":
     scheds.sort(key=lambda x: x.avgDayLen)
     scheds.sort(key=lambda x: x.longestGap)
     scheds.sort(key=lambda x: x.daysOfClass)
+
+    print("==========================================")
+    for sched in scheds:
+        for section in sched.sections:
+            print(section)
+        print("==========================================")
     exit(0)
