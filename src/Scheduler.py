@@ -1,9 +1,8 @@
 import MySQLdb
 from collections import defaultdict
 import itertools
-from flask import Flask
 import json
-import datetime
+from flask import Flask
 import secrets
 
 db = MySQLdb.connect(host=secrets.DBHOST, user=secrets.DBUSER, passwd=secrets.DBPASSWD, db=secrets.DBNAME)
@@ -233,6 +232,20 @@ def getScheds(choices):
     options = getCliques(edges, numToChoose)
     for x in options:
         x.computeRank()
+    #return options
+    schedules = []
+    for sched in options:
+        schedule = []
+        for section in sched.sections:
+            cur.execute("SELECT course_id, section, start, finish, days FROM section WHERE id='" + str(section) + "';")
+            schedInfo = (cur.fetchone())
+            cur.execute("SELECT code FROM course WHERE id='" + str(schedInfo[0]) + "';")
+            coursename = cur.fetchone()
+            schedInfo = [coursename[0]+'-'+schedInfo[1], schedInfo[2].seconds, schedInfo[3].seconds, schedInfo[4]]
+            schedule.append(schedInfo)
+        schedules.append(schedule)
+
+    print(json.dumps(schedules))
     return options
 
 def filterByStart(scheds, earliestStart):
@@ -257,6 +270,8 @@ def filterByLongestGap(scheds, maxGap):
 if __name__ == "__main__":
     choices = '[[["HIND1020-001", "CSCI3104-100", "CSCI3155-100"],3]]'
     scheds = getScheds(choices)
+
+    exit(0)
     #scheds = filterByStart(scheds, '9:00')
     #scheds = filterByFinish(scheds, '17:00')
     #scheds = filterByLongestGap(scheds, '3:00')
@@ -267,7 +282,7 @@ if __name__ == "__main__":
     #scheds.sort(key=lambda x: x.avgDayLen)
     #scheds.sort(key=lambda x: x.longestGap)
     #scheds.sort(key=lambda x: x.daysOfClass)
-
+'''
     schedules = []
     for sched in scheds:
         schedule = []
@@ -281,4 +296,4 @@ if __name__ == "__main__":
         schedules.append(schedule)
 
     print(json.dumps(schedules))
-    exit(0)
+    '''
