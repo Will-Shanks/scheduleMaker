@@ -53,12 +53,12 @@ class Node:
         self.avgDayLen = 0
         self.earliestStart = None
         self.latestFinish = None
-        self.longestGap = None
+        self.longestGap = 0
         for day in self.days.values():
             if not day == []:
                 if len(day) >= 2:
                     for i in range(len(day)-1):
-                        if(self.longestGap is None) or (self.longestGap < (day[i+1][0].seconds - day[i][1].seconds)):
+                        if(self.longestGap < (day[i+1][0].seconds - day[i][1].seconds)):
                             self.longestGap = day[i+1][0].seconds - day[i][1].seconds
                 if (self.earliestStart is None) or (day[0][0].seconds < self.earliestStart.seconds):
                     self.earliestStart = day[0][0]
@@ -72,6 +72,10 @@ class Node:
         self.avgDayLen = (self.avgDayLen/self.daysOfClass)/3600
         self.longestDay /= 3600
         self.longestGap /= 3600
+
+    def stats(self):
+        return{'avgDayLen': self.avgDayLen, 'daysOfClass': self.daysOfClass, 'earliestStart': self.earliestStart.seconds, 'latestFinish': self.latestFinish.seconds, 'longestDay':self.longestDay, 'longestGap': self.longestGap}
+
 
 # Takes course/section ID
 # Returns matrix of Nodes (course component x section) (each section is a node)
@@ -241,9 +245,10 @@ def getScheds(choices):
             schedInfo = (cur.fetchone())
             cur.execute("SELECT code FROM course WHERE id='" + str(schedInfo[0]) + "';")
             coursename = cur.fetchone()
-            schedInfo = [coursename[0]+'-'+schedInfo[1], schedInfo[2].seconds, schedInfo[3].seconds, schedInfo[4]]
+            f = lambda x: x.seconds if x else None
+            schedInfo = [coursename[0]+'-'+schedInfo[1], f(schedInfo[2]), f(schedInfo[3]), schedInfo[4]]
             schedule.append(schedInfo)
-        schedules.append(schedule)
+        schedules.append([schedule, sched.stats()])
 
     return(json.dumps(schedules))
     #return options
@@ -268,7 +273,7 @@ def filterByLongestGap(scheds, maxGap):
     return scheds
 
 if __name__ == "__main__":
-    choices = '[[["HIND1020-001", "CSCI3104-100", "CSCI3155-100"],3]]'
+    choices = '[[["HIND1020", "CSCI3104", "CSCI3155"],2]]'
     scheds = getScheds(choices)
 
     exit(0)
