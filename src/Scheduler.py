@@ -73,10 +73,6 @@ class Node:
         self.avgDayLen = (self.avgDayLen/self.daysOfClass)/3600
         self.longestDay /= 3600
         self.longestGap /= 3600
-        '''
-        stats:
-        num credits, free time in day, longest break, has online?, 
-        '''
 
 # Takes course/section ID
 # Returns matrix of Nodes (course component x section) (each section is a node)
@@ -261,20 +257,28 @@ def filterByLongestGap(scheds, maxGap):
 if __name__ == "__main__":
     choices = '[[["HIND1020-001", "CSCI3104-100", "CSCI3155-100"],3]]'
     scheds = getScheds(choices)
-    scheds = filterByStart(scheds, '9:00')
+    #scheds = filterByStart(scheds, '9:00')
     #scheds = filterByFinish(scheds, '17:00')
     #scheds = filterByLongestGap(scheds, '3:00')
 
-    scheds.sort(key=lambda x: x.longestDay)
-    scheds.sort(key=lambda x: x.latestFinish.seconds, reverse=True)
-    scheds.sort(key=lambda x: x.earliestStart.seconds)
-    scheds.sort(key=lambda x: x.avgDayLen)
-    scheds.sort(key=lambda x: x.longestGap)
-    scheds.sort(key=lambda x: x.daysOfClass)
+    #scheds.sort(key=lambda x: x.longestDay)
+    #scheds.sort(key=lambda x: x.latestFinish.seconds, reverse=True)
+    #scheds.sort(key=lambda x: x.earliestStart.seconds)
+    #scheds.sort(key=lambda x: x.avgDayLen)
+    #scheds.sort(key=lambda x: x.longestGap)
+    #scheds.sort(key=lambda x: x.daysOfClass)
 
-    print("==========================================")
+    schedules = []
     for sched in scheds:
+        schedule = []
         for section in sched.sections:
-            print(section)
-        print("==========================================")
+            cur.execute("SELECT course_id, section, start, finish, days FROM section WHERE id='" + str(section) + "';")
+            schedInfo = (cur.fetchone())
+            cur.execute("SELECT code FROM course WHERE id='" + str(schedInfo[0]) + "';")
+            coursename = cur.fetchone()
+            schedInfo = [coursename[0]+'-'+schedInfo[1], schedInfo[2].seconds, schedInfo[3].seconds, schedInfo[4]]
+            schedule.append(schedInfo)
+        schedules.append(schedule)
+
+    print(json.dumps(schedules))
     exit(0)
