@@ -245,8 +245,8 @@ def getScheds(choices):
             schedule.append(schedInfo)
         schedules.append(schedule)
 
-    print(json.dumps(schedules))
-    return options
+    return(json.dumps(schedules))
+    #return options
 
 def filterByStart(scheds, earliestStart):
     earliestStart = earliestStart.split(":")
