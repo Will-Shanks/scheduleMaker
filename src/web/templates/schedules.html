@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="jumbotron">
+  <form id="frmClassInfo">
+    <div class="form-group">
+      <label for="frmClassNum">Number of Classes</label>
+      <input type="number" class="form-control" id="frmClassNum" name="classNum" value=3>
+    </div>
+
+    <div class="form-group">
+      <label for="frmClassList">Class Selection</label>
+      <select multiple class="form-control" id="frmClassList" name="classList">
+        {% for class in classes %}
+          <option selected="selected" value="{{ class }}">{{ class }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <button type="submit" id="btnGenerate" class="btn btn-primary">Generate Schedules</button>
+  </form>
+</div>
+
+<div>
+  <div class="row">
+    <div class="col-md-12 col-lg-6 colSched" id="colLeft">
+      <!-- Tables will be dynamically inserted here-->
+    </div>
+    <div class="d-none d-lg-block col-lg-6 colSched" id="colRight">
+      <!-- Tables will be dynamically inserted here-->
+    </div>
+  </div>
+
+</div>
+
+{% endblock %}

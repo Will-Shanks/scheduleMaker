@@ -1,0 +1,11 @@
+body, html {
+  height:100%;
+}
+
+#colLeft, #colRight {
+  height: 90vh;
+  overflow-y: scroll;
+}
+
+header > h3 { display: inline-block; }
+header span { margin-left: 30px; }

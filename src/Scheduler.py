@@ -2,13 +2,20 @@ import MySQLdb
 from collections import defaultdict
 import itertools
 import json
-from flask import Flask
+from flask import Flask, render_template, request, abort
 import secrets
+
+import argparse
+import logging
+import pprint
 
 db = MySQLdb.connect(host=secrets.DBHOST, user=secrets.DBUSER, passwd=secrets.DBPASSWD, db=secrets.DBNAME)
 cur = db.cursor()
 
-app = Flask(__name__)
+app = Flask(__name__,
+            static_url_path='',
+            static_folder='web/static',
+            template_folder='web/templates')
 
 class Node:
     def __init__(self, sections):
@@ -201,10 +208,12 @@ def getCliques(graphEdges, numNodesToChoose):
     results = [Node(x) for x in solutions]
     return results
 
-@app.route('/<choices>')
 def getScheds(choices):
     choices = json.loads(choices)# options will be matrix of section nodes
     options = []
+
+    logging.info(pprint.pformat(choices))
+
     # choice == ["course1", ... "coursen"], numToChoose
     # makes matrix of nodes where each node is a clique
     for choice in choices:
@@ -236,10 +245,10 @@ def getScheds(choices):
     options = getCliques(edges, numToChoose)
     for x in options:
         x.computeRank()
-    #return options
     schedules = []
     for sched in options:
-        schedule = []
+        schedule = {}
+        scheds = []
         for section in sched.sections:
             cur.execute("SELECT course_id, section, start, finish, days FROM section WHERE id='" + str(section) + "';")
             schedInfo = (cur.fetchone())
@@ -247,17 +256,16 @@ def getScheds(choices):
             coursename = cur.fetchone()
             f = lambda x: x.seconds if x else None
             schedInfo = [coursename[0]+'-'+schedInfo[1], f(schedInfo[2]), f(schedInfo[3]), schedInfo[4]]
-            schedule.append(schedInfo)
-        schedules.append([schedule, sched.stats()])
-
-    return(json.dumps(schedules))
-    #return options
+            scheds.append(schedInfo)
+        schedule['scheds'] = scheds
+        schedule['stats'] = sched.stats()
+        schedules.append(schedule)
+    return schedules
 
 def filterByStart(scheds, earliestStart):
     earliestStart = earliestStart.split(":")
     earliestStart = int(earliestStart[0]) * 3600 + int(earliestStart[1]) * 60
     scheds = [x for x in scheds if x.earliestStart.seconds >= earliestStart]
-
     return scheds
 
 def filterByFinish(scheds, finishTime):
@@ -272,11 +280,95 @@ def filterByLongestGap(scheds, maxGap):
     scheds = [x for x in scheds if x.longestGap <= maxGap]
     return scheds
 
-if __name__ == "__main__":
-    choices = '[[["HIND1020", "CSCI3104", "CSCI3155"],2]]'
-    scheds = getScheds(choices)
 
-    exit(0)
+
+@app.route('/')
+def root():
+    classes = ['HIND1020-001', 'CSCI3104-100', 'CSCI3155-100']
+    return render_template('schedules.html', classes=map(json.dumps, classes))
+
+@app.route('/', methods=['POST'])
+def classForm():
+   result = request.get_json()
+   logging.info(pprint.pformat(result))
+
+   choices = []
+   selection =[]
+   choice = []
+
+   for section in result['classList']:
+      choice.append(section)
+   selection.append(choice)
+   selection.append(int(result['classNum']))
+   choices.append(selection)
+
+   schedules = getScheds(json.dumps(choices))
+
+   dayIndex = {'M':1,'T':2, 'W':3, 'R':4, 'F':5}
+
+   startEarliest = 8
+   startLatest = 18
+   startStep = 1
+
+   n = startLatest - startEarliest + 1   # !!! TODO Use startStep
+   m = 6
+   weekViews = []
+   for num, schedule in enumerate(schedules, start=1):
+       week = {}
+       weekSched = [[''] * m for i in range(n)]
+       for i in range(n):
+          weekSched[i][0] = '{:02d}'.format(startEarliest + i*startStep) + ':00'  ## !!! TODO
+
+       logging.debug(pprint.pformat(schedule))
+       for sched in schedule['scheds']:
+           logging.debug(pprint.pformat(sched))
+
+           for day in sched[3]:
+               weekSched[startIndex(sched[1], startEarliest)][dayIndex[day]] = sched[0]
+               # !!! TODO Add something for End, ie may be a double period etc
+       week['sched'] = weekSched
+       week['stats'] = schedule['stats']
+       weekViews.append(week)
+
+   logging.debug(pprint.pformat(weekViews))
+   return json.dumps(weekViews)
+
+def startIndex(seconds, startEarliest):
+    hours = seconds / 3600
+    return int(hours-startEarliest)
+
+def getTimeString(seconds):
+    hours = seconds / 3600
+    mins = (seconds%3600)/60
+    sec = (seconds%3600)%60
+    return '{:02d}'.format(int(hours)) + ':' '{:02d}'.format(int(mins))
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        '-d', '--debug',
+        help="Run in debug mode and print lots of debugging statements",
+        action="store_const", dest="loglevel", const=logging.DEBUG,
+        default=logging.WARNING,
+    )
+    parser.add_argument(
+        '-v', '--verbose',
+        help="Be verbose",
+        action="store_const", dest="loglevel", const=logging.INFO,
+    )
+    args = parser.parse_args()
+
+    logging.basicConfig(level=args.loglevel)
+    if logging.getLogger().isEnabledFor(logging.DEBUG):
+        app.run(debug = True)
+    else:
+        app.run(host='0.0.0.0', port=80)
+
+    #choices = [[["HIND1020-001", "CSCI3104-100", "CSCI3155-100"],3]]
+    #scheds = getScheds(choices)
+
+    #exit(0)
     #scheds = filterByStart(scheds, '9:00')
     #scheds = filterByFinish(scheds, '17:00')
     #scheds = filterByLongestGap(scheds, '3:00')
