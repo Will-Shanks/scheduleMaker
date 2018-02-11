@@ -1,37 +1,52 @@
 # README
 
-__Required Python Libraries:__
+**Required Python Libraries:**
+
 - mysqlclient
 - flask
 
-__Setup__
+**Setup**
+
 1. Install python3 and pip3
 
 2. Install python library MySQLdb and Flask
-       pip3 install mysqlclient
-       pip3 install flask
+
+    ```
+    pip3 install mysqlclient
+    pip3 install flask
+    ```
+
 3. Install mysql
 4. Create 'secrets.py' file in src folder that looks like:
+
     ```
-    DBHOST="<DB IP>"
-    DBUSER="<DB user>"
-    DBPASSWD="<DB user password>"
-    DBNAME="<DB Name>"
+     DBHOST="<DB IP>"
+     DBUSER="<DB user>"
+     DBPASSWD="<DB user password>"
+     DBNAME="<DB Name>"
     ```
 
-__Running__
+**Running**
+
 1. Setup Flask app
 
-       set FLASK_APP=src\Scheduler.py
-       flask run
+    ```
+    set FLASK_APP=src\Scheduler.py
+    flask run
+    ```
+
 2. Query API
+
     - Choose k of ClassA classes, choose i of classB classes, etc
 
     - Can be Course of Section ID
-    ```
-     <BASEURL>/[[["CLassA1","ClassA2", ... "ClassAN"],k],[["ClassB1", "ClassB2", ... "ClassBM"],i], ... ]
-    ```
+
+      ```
+      <BASEURL>/[[["CLassA1","ClassA2", ... "ClassAN"],k],[["ClassB1", "ClassB2", ... "ClassBM"],i], ... ]
+      ```
+
     - Returns json
+
       ```
       [
         [
@@ -60,4 +75,5 @@ __Running__
         //more schedules
         ....
       ]
-      ````
+      `
+      ```

@@ -65,19 +65,19 @@ class Node:
         for day in self.days.values():
             if not day == []:
                 if len(day) >= 2:
-                    for i in range(len(day)-1):
-                        if(self.longestGap < (day[i+1][0].seconds - day[i][1].seconds)):
-                            self.longestGap = day[i+1][0].seconds - day[i][1].seconds
+                    for i in range(len(day) - 1):
+                        if(self.longestGap < (day[i + 1][0].seconds - day[i][1].seconds)):
+                            self.longestGap = day[i + 1][0].seconds - day[i][1].seconds
                 if (self.earliestStart is None) or (day[0][0].seconds < self.earliestStart.seconds):
                     self.earliestStart = day[0][0]
-                if (self.latestFinish is None) or (day[len(day)-1][1].seconds > self.latestFinish.seconds):
-                    self.latestFinish = day[len(day)-1][1]
+                if (self.latestFinish is None) or (day[len(day) - 1][1].seconds > self.latestFinish.seconds):
+                    self.latestFinish = day[len(day) - 1][1]
                 self.daysOfClass += 1
-                dayLen = day[len(day)-1][1].seconds - day[0][0].seconds
+                dayLen = day[len(day) - 1][1].seconds - day[0][0].seconds
                 self.avgDayLen += dayLen
                 if dayLen > self.longestDay:
                     self.longestDay = dayLen
-        self.avgDayLen = (self.avgDayLen/self.daysOfClass)/3600
+        self.avgDayLen = (self.avgDayLen / self.daysOfClass) / 3600
         self.longestDay /= 3600
         self.longestGap /= 3600
 
@@ -261,7 +261,7 @@ def getScheds(choices):
 
             def f(x):
                 lambda x: x.seconds if x else None
-            schedInfo = [coursename[0]+'-'+schedInfo[1], f(schedInfo[2]), f(schedInfo[3]), schedInfo[4]]
+            schedInfo = [coursename[0] + '-' + schedInfo[1], f(schedInfo[2]), f(schedInfo[3]), schedInfo[4]]
             scheds.append(schedInfo)
         schedule['scheds'] = scheds
         schedule['stats'] = sched.stats()
@@ -326,7 +326,7 @@ def classForm():
         week = {}
         weekSched = [[''] * m for i in range(n)]
         for i in range(n):
-            weekSched[i][0] = '{:02d}'.format(startEarliest + i*startStep) + ':00'   # !!! TODO
+            weekSched[i][0] = '{:02d}'.format(startEarliest + i * startStep) + ':00'   # !!! TODO
 
         logging.debug(pprint.pformat(schedule))
         for sched in schedule['scheds']:
@@ -345,12 +345,12 @@ def classForm():
 
 def startIndex(seconds, startEarliest):
     hours = seconds / 3600
-    return int(hours-startEarliest)
+    return int(hours - startEarliest)
 
 
 def getTimeString(seconds):
     hours = seconds / 3600
-    mins = (seconds % 3600)/60
+    mins = (seconds % 3600) / 60
     # sec = (seconds % 3600) % 60
     return '{:02d}'.format(int(hours)) + ':' '{:02d}'.format(int(mins))
 
