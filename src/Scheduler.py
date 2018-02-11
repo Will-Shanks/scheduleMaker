@@ -1,8 +1,8 @@
-import MySQLdb
+import MySQLdb  # mysqlclient
 from collections import defaultdict
 import itertools
 import json
-from flask import Flask, render_template, request, abort
+from flask import Flask, render_template, request
 import secrets
 
 import argparse
@@ -16,6 +16,7 @@ app = Flask(__name__,
             static_url_path='',
             static_folder='web/static',
             template_folder='web/templates')
+
 
 class Node:
     def __init__(self, sections):
@@ -45,7 +46,7 @@ class Node:
                     while i < len(b.days[day]):
                         if timeRange[0] == b.days[day][i][0] or timeRange[1] == b.days[day][i][1]:
                             return False
-                        if timeRange[0] < b.days[day][i][0]: # self starts before b
+                        if timeRange[0] < b.days[day][i][0]:  # self starts before b
                             if timeRange[1] > b.days[day][i][0]:
                                 return False
                         if timeRange[0] > b.days[day][i][0]:
@@ -81,7 +82,7 @@ class Node:
         self.longestGap /= 3600
 
     def stats(self):
-        return{'avgDayLen': self.avgDayLen, 'daysOfClass': self.daysOfClass, 'earliestStart': self.earliestStart.seconds, 'latestFinish': self.latestFinish.seconds, 'longestDay':self.longestDay, 'longestGap': self.longestGap}
+        return{'avgDayLen': self.avgDayLen, 'daysOfClass': self.daysOfClass, 'earliestStart': self.earliestStart.seconds, 'latestFinish': self.latestFinish.seconds, 'longestDay': self.longestDay, 'longestGap': self.longestGap}
 
 
 # Takes course/section ID
@@ -121,6 +122,7 @@ def getCourseComponents(course):
         courseComponents.append(component)
     return courseComponents
 
+
 # Takes matrix of Nodes
 # Returns dict of lists node: [edges]
 def buildGraph(vertexNodes):
@@ -139,6 +141,7 @@ def buildGraph(vertexNodes):
                             graph[vertexNodes[k][l]].add(vertexNodes[i][j])
                     k -= 1
     return graph
+
 
 # Takes dict of lists of nodes and their edges
 # Returns list of nodes where each node is a clique of size <numNodesToChoose> of the input nodes
@@ -208,8 +211,9 @@ def getCliques(graphEdges, numNodesToChoose):
     results = [Node(x) for x in solutions]
     return results
 
+
 def getScheds(choices):
-    choices = json.loads(choices)# options will be matrix of section nodes
+    choices = json.loads(choices)  # options will be matrix of section nodes
     options = []
 
     logging.info(pprint.pformat(choices))
@@ -234,7 +238,7 @@ def getScheds(choices):
             # edges[i] = [[edges], [sectionIDs]]
             edges = buildGraph(components)
             # getCliques returns list of nodes (each possible clique is a node
-            #getCliques(list of edges, num of nodes to choose
+            # getCliques(list of edges, num of nodes to choose
             options.append(getCliques(edges, choice[1]))
 
     options.sort(key=lambda comp: len(comp))
@@ -254,7 +258,9 @@ def getScheds(choices):
             schedInfo = (cur.fetchone())
             cur.execute("SELECT code FROM course WHERE id='" + str(schedInfo[0]) + "';")
             coursename = cur.fetchone()
-            f = lambda x: x.seconds if x else None
+
+            def f(x):
+                lambda x: x.seconds if x else None
             schedInfo = [coursename[0]+'-'+schedInfo[1], f(schedInfo[2]), f(schedInfo[3]), schedInfo[4]]
             scheds.append(schedInfo)
         schedule['scheds'] = scheds
@@ -262,17 +268,20 @@ def getScheds(choices):
         schedules.append(schedule)
     return schedules
 
+
 def filterByStart(scheds, earliestStart):
     earliestStart = earliestStart.split(":")
     earliestStart = int(earliestStart[0]) * 3600 + int(earliestStart[1]) * 60
     scheds = [x for x in scheds if x.earliestStart.seconds >= earliestStart]
     return scheds
 
+
 def filterByFinish(scheds, finishTime):
     finishTime = finishTime.split(':')
     finishTime = int(finishTime[0]) * 3600 + int(finishTime[1]) * 60
     scheds = [x for x in scheds if x.latestFinish.seconds <= finishTime]
     return scheds
+
 
 def filterByLongestGap(scheds, maxGap):
     maxGap = maxGap.split(':')
@@ -281,66 +290,68 @@ def filterByLongestGap(scheds, maxGap):
     return scheds
 
 
-
 @app.route('/')
 def root():
     classes = ['HIND1020-001', 'CSCI3104-100', 'CSCI3155-100']
     return render_template('schedules.html', classes=map(json.dumps, classes))
 
+
 @app.route('/', methods=['POST'])
 def classForm():
-   result = request.get_json()
-   logging.info(pprint.pformat(result))
+    result = request.get_json()
+    logging.info(pprint.pformat(result))
 
-   choices = []
-   selection =[]
-   choice = []
+    choices = []
+    selection = []
+    choice = []
 
-   for section in result['classList']:
-      choice.append(section)
-   selection.append(choice)
-   selection.append(int(result['classNum']))
-   choices.append(selection)
+    for section in result['classList']:
+        choice.append(section)
+    selection.append(choice)
+    selection.append(int(result['classNum']))
+    choices.append(selection)
 
-   schedules = getScheds(json.dumps(choices))
+    schedules = getScheds(json.dumps(choices))
 
-   dayIndex = {'M':1,'T':2, 'W':3, 'R':4, 'F':5}
+    dayIndex = {'M': 1, 'T': 2, 'W': 3, 'R': 4, 'F': 5}
 
-   startEarliest = 8
-   startLatest = 18
-   startStep = 1
+    startEarliest = 8
+    startLatest = 18
+    startStep = 1
 
-   n = startLatest - startEarliest + 1   # !!! TODO Use startStep
-   m = 6
-   weekViews = []
-   for num, schedule in enumerate(schedules, start=1):
-       week = {}
-       weekSched = [[''] * m for i in range(n)]
-       for i in range(n):
-          weekSched[i][0] = '{:02d}'.format(startEarliest + i*startStep) + ':00'  ## !!! TODO
+    n = startLatest - startEarliest + 1   # !!! TODO Use startStep
+    m = 6
+    weekViews = []
+    for num, schedule in enumerate(schedules, start=1):
+        week = {}
+        weekSched = [[''] * m for i in range(n)]
+        for i in range(n):
+            weekSched[i][0] = '{:02d}'.format(startEarliest + i*startStep) + ':00'   # !!! TODO
 
-       logging.debug(pprint.pformat(schedule))
-       for sched in schedule['scheds']:
-           logging.debug(pprint.pformat(sched))
+        logging.debug(pprint.pformat(schedule))
+        for sched in schedule['scheds']:
+            logging.debug(pprint.pformat(sched))
 
-           for day in sched[3]:
-               weekSched[startIndex(sched[1], startEarliest)][dayIndex[day]] = sched[0]
-               # !!! TODO Add something for End, ie may be a double period etc
-       week['sched'] = weekSched
-       week['stats'] = schedule['stats']
-       weekViews.append(week)
+            for day in sched[3]:
+                weekSched[startIndex(sched[1], startEarliest)][dayIndex[day]] = sched[0]
+                # !!! TODO Add something for End, ie may be a double period etc
+        week['sched'] = weekSched
+        week['stats'] = schedule['stats']
+        weekViews.append(week)
 
-   logging.debug(pprint.pformat(weekViews))
-   return json.dumps(weekViews)
+    logging.debug(pprint.pformat(weekViews))
+    return json.dumps(weekViews)
+
 
 def startIndex(seconds, startEarliest):
     hours = seconds / 3600
     return int(hours-startEarliest)
 
+
 def getTimeString(seconds):
     hours = seconds / 3600
-    mins = (seconds%3600)/60
-    sec = (seconds%3600)%60
+    mins = (seconds % 3600)/60
+    # sec = (seconds % 3600) % 60
     return '{:02d}'.format(int(hours)) + ':' '{:02d}'.format(int(mins))
 
 
@@ -361,24 +372,24 @@ if __name__ == "__main__":
 
     logging.basicConfig(level=args.loglevel)
     if logging.getLogger().isEnabledFor(logging.DEBUG):
-        app.run(debug = True)
+        app.run(debug=True)
     else:
         app.run(host='0.0.0.0', port=80)
 
-    #choices = [[["HIND1020-001", "CSCI3104-100", "CSCI3155-100"],3]]
-    #scheds = getScheds(choices)
+    # choices = [[["HIND1020-001", "CSCI3104-100", "CSCI3155-100"],3]]
+    # scheds = getScheds(choices)
 
-    #exit(0)
-    #scheds = filterByStart(scheds, '9:00')
-    #scheds = filterByFinish(scheds, '17:00')
-    #scheds = filterByLongestGap(scheds, '3:00')
+    # exit(0)
+    # scheds = filterByStart(scheds, '9:00')
+    # scheds = filterByFinish(scheds, '17:00')
+    # scheds = filterByLongestGap(scheds, '3:00')
 
-    #scheds.sort(key=lambda x: x.longestDay)
-    #scheds.sort(key=lambda x: x.latestFinish.seconds, reverse=True)
-    #scheds.sort(key=lambda x: x.earliestStart.seconds)
-    #scheds.sort(key=lambda x: x.avgDayLen)
-    #scheds.sort(key=lambda x: x.longestGap)
-    #scheds.sort(key=lambda x: x.daysOfClass)
+    # scheds.sort(key=lambda x: x.longestDay)
+    # scheds.sort(key=lambda x: x.latestFinish.seconds, reverse=True)
+    # scheds.sort(key=lambda x: x.earliestStart.seconds)
+    # scheds.sort(key=lambda x: x.avgDayLen)
+    # scheds.sort(key=lambda x: x.longestGap)
+    # scheds.sort(key=lambda x: x.daysOfClass)
 '''
     schedules = []
     for sched in scheds:
